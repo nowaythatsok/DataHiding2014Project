@@ -14,11 +14,11 @@ if debug_on == 0
     %file_name = 'lena.jpg'
     %G = imread(file_name,'jpg');
     
-    %file_name = 'tulipano10.jpg';
-    file_name = 'tampered.jpg';
+    file_name = 'tulipano10.jpg';
+    %file_name = 'tampered.jpg';
     img = imread(file_name,'jpg');
     G   = rgb2gray(img);
-    G=G(700:1300,700:1300)
+    %G=G(700:1300,700:1300);
    
     
 else
@@ -85,9 +85,6 @@ for i=2:Xdim-1
 end
 
 
-
-
-
 %accumulation
 %of range 0-255*33
 a_x=zeros(Xdim,Ydim);
@@ -122,7 +119,10 @@ for i=18:Xdim-17
             +  median([a_ry(i,j-16) a_ry(i,j-8) a_ry(i,j) a_ry(i,j+8) a_ry(i,j+16)]); 
     end
 end
-subplot(2,2,4); imshow(b);
+
+if plot_switch==1
+    subplot(2,2,4); imshow(uint8(b*255/max(max(b,[],1),);
+end
 
 if plot_switch==1
     figure;
@@ -132,9 +132,10 @@ if plot_switch==1
     subplot(2,2,4); imshow(a_rx);
 end
 
-figure;
-imshow(uint8(G)+uint8(b));
-    
+
+    figure;
+    imshow(uint8(G)+uint8(b));
+
 
 %b=uint8(b);
 
@@ -156,10 +157,12 @@ for i=1:8
 end
 [~,X]=max(gx);
 
-figure; 
-subplot(2,2,1);plot(cx8);
-subplot(2,2,3);plot(gx);
-
+if plot_switch==1
+    figure; 
+    subplot(2,2,1);plot(cx8);
+    subplot(2,2,3);plot(gx);
+end
+    
 Cy=zeros(1,Ydim);
 for i=1:Xdim
     Cy=Cy+b(i, 1:Ydim);
@@ -173,8 +176,10 @@ for i=1:8
     gy(i)=cy8(i)-cy8(mod(i,8)+1);
 end
 
-subplot(2,2,2);plot(cy8);
-subplot(2,2,4);plot(gy);
+if plot_switch==1
+    subplot(2,2,2);plot(cy8);
+    subplot(2,2,4);plot(gy);
+end
 [~,Y]=max(gy);
 
 translate_x=X-1;
@@ -182,14 +187,16 @@ translate_y=Y-1;
 
 %plot check MTRX
 Ch=ones(Xdim, Ydim);
-for i=1:(floor(Ydim/8)-2)
+for i=1:(floor(Xdim/8)-2)
     for j=1:(floor(Ydim/8)-2)
         Ch(8*i+translate_x,8*j+translate_y)=0;
     end
 end
-figure;
-imshow(Ch);
 
+if plot_switch==1
+    figure;
+    imshow(Ch);
+end
 
 %BAG feature EXTRACTION
 B=zeros(floor(Xdim/8),floor(Ydim/8));
