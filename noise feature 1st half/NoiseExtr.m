@@ -18,7 +18,7 @@ start_time = cputime;
 
 %clustering with SLIC algo
 % 1000 superpixels using a weighting factor of 1.5 
-number_of_segment = 200;
+number_of_segment = 5;
 %[l, Am, C] = slic(G, number_of_segment, 1.5, 1, 'median');
 [l, Am, C] = slic(G, number_of_segment, 30, 1.5, 'median');
 %Am is just a copy of l i this implementation!!!!!!!!!!
@@ -34,14 +34,15 @@ for i=2:imH-1
     for j=2:imW-1
         for k=-1:1
             for x=-1:1
-                if(l(i,j) ~= l(i+k,j+x) && adj_matrix(l(i,j), l(i+k,j+x)) ~= 0)
+                if(l(i,j) ~= l(i+k,j+x))
                     adj_matrix(l(i,j), l(i+k,j+x)) = 1;
                 end
             end
         end
      end
 end
-
+%l
+%adj_matrix
 %rgb2gray converts RGB values to grayscale values by forming 
 %a weighted sum of the R, G, and B components:
 I = rgb2gray(G);
@@ -218,78 +219,113 @@ hold off;
 
 
 %preparation for max-flow-min-cut algorithm
-K = 0.1; %constant K                                %value of interaction penalty
+K = 0.1; %constant K %value of interaction penalty
         
                                                     
 w_adj_matrix(1:number_of_segment,1:number_of_segment)=adj_matrix*K;
-adj_matrix=[adj_matrix, ones(number_of_segment,1), zeros(number_of_segment,1); zeros(1,number_of_segment+2);ones(1,number_of_segment), zeros(1,2)];
+
+%make work vertices for the triangles
+E=sum(sum(adj_matrix))/2;% number of edges in the graph
+work_vertices_right=zeros(number_of_segment+2,E);
+work_vertices_down=zeros(E,number_of_segment+2);
+
+% -------------------------
+% | \ data  | |           |
+% |  0 \    | |     WVR   |
+% |________\|_|           |
+% |         |0|           |
+% -------------------------
+% |           |           |
+% |           |    zeros  |
+% |    WVD    |           |
+% |           |           |
+% -------------------------
+
+% fill in the work fields
+edge_counter=0;
+
+for j=1:number_of_segment
+    for i=1:j
+        if adj_matrix(i,j)==1
+            edge_counter=edge_counter+1;
+            work_vertices_right(j,edge_counter)=K;
+            work_vertices_down(edge_counter, i)=K;
+            
+        end
+    end
+end
+w_adj_matrix=triu(w_adj_matrix,1);
+
+number_of_segment
+w_adj_matrix=[...
+    [w_adj_matrix, zeros(number_of_segment,1), ones(number_of_segment,1);...
+    ones(1,number_of_segment),zeros(1,2);zeros(1,number_of_segment+2);...
+    work_vertices_down...
+    ]...
+    ,[ work_vertices_right;zeros(E)]];
+
 
 
 for j=1:number_of_segment
-    w_adj_matrix(1,j)=w(j,1)+K*(sum(adj_matrix(j,:))-2);
-    w_adj_matrix(2,j)=w(j,2)+K*(sum(adj_matrix(j,:)-2));
-    w_adj_matrix(j,1)=w(j,1)+K*(sum(adj_matrix(j,:)-2));
-    w_adj_matrix(j,2)=w(j,2)+K*(sum(adj_matrix(j,:)-2));
+    w_adj_matrix(number_of_segment+1,j)=w(j,1)+K*(sum(adj_matrix(j,:))/2);
+    %w_adj_matrix(number_of_segment+2,j)=w(j,2)+K*(sum(adj_matrix(j,:))/2);
+    %w_adj_matrix(j,number_of_segment+1)=w(j,1)+K*(sum(adj_matrix(j,:))/2);
+    w_adj_matrix(j,number_of_segment+2)=w(j,2)+K*(sum(adj_matrix(j,:))/2);
 end
 
-
-
-% Add the Work folder and all its subfolders to the search path.
-addpath(genpath('.\'))
-
-
+w_adj_matrix=floor(w_adj_matrix*100);
 
 size(w_adj_matrix)
 [~,~,Orig] = graphmaxflow(sparse(w_adj_matrix), number_of_segment+1, number_of_segment+2);
-O1=Orig(1,:);
+O1=Orig(1,:)
 
-% L=zeros(imH,imW); %labels
-% 
-% % create label matrix L
-% for i=1:imH
-%     for j=1:imW      
-%         L(i,j) = 1-O1(l(i,j));
-%     end
-% end
-% 
-% % create block indicator A
-% A = zeros(imH, imW);
-% for i=1:8:imH-8
-%     for j=1:8:imW-8
-%         temp = 0;
-%         for k=0:7
-%             for z=0:7
-%                 temp = temp + L(i+k,j+z);
-%             end
-%         end
-%         temp = temp / 64;
-%         for k=0:7
-%             for z=0:7
-%                 A(i+k,j+z) = temp;
-%             end
-%         end
-%     end
-% end
-% 
-% for i=1:imH
-%     for j=1:imW
-%         if(A(i,j) >= 0.5)
-%             G(i,j,1) = 255;
-%             G(i,j,2) = 0;
-%             G(i,j,3) = 0;
-%         end
-%     end
-% end
-% figure;
-% imshow(G);
-% 
-% % print the images
-% %subplot(1,2,1); imshow(img);
-% %title(sprintf('Original %s', file_name));
-% % Time evaluation
-% stop_time = cputime;
-% fprintf('Execution time = %0.5f sec\n',abs( start_time - stop_time));
-% 
-% 
+L=zeros(imH,imW); %labels
+
+% create label matrix L
+for i=1:imH
+    for j=1:imW      
+        L(i,j) = O1(l(i,j));
+    end
+end
+
+% create block indicator A
+A = zeros(imH, imW);
+for i=1:8:imH-8
+    for j=1:8:imW-8
+        temp = 0;
+        for k=0:7
+            for z=0:7
+                temp = temp + L(i+k,j+z);
+            end
+        end
+        temp = temp / 64;
+        for k=0:7
+            for z=0:7
+                A(i+k,j+z) = temp;
+            end
+        end
+    end
+end
+
+for i=1:imH
+    for j=1:imW
+        if(A(i,j) >= 0.5)
+            G(i,j,1) = 255;
+            G(i,j,2) = 0;
+            G(i,j,3) = 0;
+        end
+    end
+end
+figure;
+imshow(G);
+
+% print the images
+%subplot(1,2,1); imshow(img);
+%title(sprintf('Original %s', file_name));
+% Time evaluation
+stop_time = cputime;
+fprintf('Execution time = %0.5f sec\n',abs( start_time - stop_time));
+
+
 
 
