@@ -10,15 +10,15 @@ start_time = cputime;
  G(100:199,100:199,1)=rand(100,100)*1;
  G(100:199,100:199,2)=rand(100,100)*1;
  G(100:199,100:199,3)=rand(100,100)*100;
- figure;
- imshow(G);
+ %figure;
+ %imshow(G);
  
 %G = imread('tulipano10.jpg');
 % Noise estimation
 
 %clustering with SLIC algo
 % 1000 superpixels using a weighting factor of 1.5 
-number_of_segment = 5;
+number_of_segment = 15;
 %[l, Am, C] = slic(G, number_of_segment, 1.5, 1, 'median');
 [l, Am, C] = slic(G, number_of_segment, 30, 1.5, 'median');
 %Am is just a copy of l i this implementation!!!!!!!!!!
@@ -62,8 +62,8 @@ for i=1:imH
         end
     end
 end
-figure;
-imshow(Z);
+%figure;
+%imshow(Z);
 
 
 % creation of filters
@@ -206,85 +206,209 @@ for i=1:number_of_segment
 end
 
 
-w(l(5,5),1)
-w(l(5,5),2)
-w(l(150,150),1)
-w(l(150,150),2)
+%w(l(5,5),1)
+%w(l(5,5),2)
+%w(l(150,150),1)
+%w(l(150,150),2)
 figure;
 plot(w(:,1));
 hold on;
-plot(w(:,2));
+plot(w(:,2)+max_distance+2);
 hold off;
 
 
 
-%preparation for max-flow-min-cut algorithm
-K = 0.1; %constant K %value of interaction penalty
-        
-                                                    
-w_adj_matrix(1:number_of_segment,1:number_of_segment)=adj_matrix*K;
+%preparation for Symplex algorithm-----------------------------------------
+K = 0.1; %value of interaction penalty
 
-%make work vertices for the triangles
-E=sum(sum(adj_matrix))/2;% number of edges in the graph
-work_vertices_right=zeros(number_of_segment+2,E);
-work_vertices_down=zeros(E,number_of_segment+2);
+%count number of edges with the original formation, without S,T
+E=sum(sum(adj_matrix))/2;
 
-% -------------------------
-% | \ data  | |           |
-% |  0 \    | |     WVR   |
-% |________\|_|           |
-% |         |0|           |
-% -------------------------
-% |           |           |
-% |           |    zeros  |
-% |    WVD    |           |
-% |           |           |
-% -------------------------
-
-% fill in the work fields
+%create neigbourhood matrix
+N=zeros(number_of_segment,E);
+Print_m=adj_matrix;
 edge_counter=0;
-
-for j=1:number_of_segment
-    for i=1:j
-        if adj_matrix(i,j)==1
+for i=1:number_of_segment
+    for j=1:i
+        if adj_matrix(i,j)==1;
             edge_counter=edge_counter+1;
-            work_vertices_right(j,edge_counter)=K;
-            work_vertices_down(edge_counter, i)=K;
-            
+            N(i,edge_counter)=1;
+            N(j,edge_counter)=-1;
+            Print_m(i,j)=edge_counter;
         end
     end
 end
-w_adj_matrix=triu(w_adj_matrix,1);
-
-number_of_segment
-w_adj_matrix=[...
-    [w_adj_matrix, zeros(number_of_segment,1), ones(number_of_segment,1);...
-    ones(1,number_of_segment),zeros(1,2);zeros(1,number_of_segment+2);...
-    work_vertices_down...
-    ]...
-    ,[ work_vertices_right;zeros(E)]];
 
 
-
-for j=1:number_of_segment
-    w_adj_matrix(number_of_segment+1,j)=w(j,1)+K*(sum(adj_matrix(j,:))/2);
-    %w_adj_matrix(number_of_segment+2,j)=w(j,2)+K*(sum(adj_matrix(j,:))/2);
-    %w_adj_matrix(j,number_of_segment+1)=w(j,1)+K*(sum(adj_matrix(j,:))/2);
-    w_adj_matrix(j,number_of_segment+2)=w(j,2)+K*(sum(adj_matrix(j,:))/2);
+%make weights
+W=zeros(number_of_segment*2,1);
+for i=1:number_of_segment
+    W(i,1)                    =   w(i,1)+K*(sum(adj_matrix(i,:))/2);
+    W(number_of_segment+i,1)  =   w(i,2)+K*(sum(adj_matrix(i,:))/2);
 end
 
-w_adj_matrix=floor(w_adj_matrix*100);
+%add S and T, create LP matrices 
+A=eye(2*E+number_of_segment*2);
+Aeq=[N,-N,eye(number_of_segment),-eye(number_of_segment)];
+f=[zeros(1,2*E+number_of_segment),-ones(1,number_of_segment)];
+beq=zeros(number_of_segment,1);
+ble=[ones(2*E,1)*K;W];
 
-size(w_adj_matrix)
-[~,~,Orig] = graphmaxflow(sparse(w_adj_matrix), number_of_segment+1, number_of_segment+2);
-O1=Orig(1,:)
+
+% %structure odf the lp mtrx:
+%     E               E           noP         noP
+% -----------------------------------------------------
+% |           |            |             |            |
+% |           |            |             |            |
+% |   1       |            |             |            |  < Weights of edges
+% |           |            |             |            |
+% |           |            |             |            |
+% |-----------|------------|             |            |       
+% |           |            |             |            |
+% |           |     1      |             |            |  
+% |           |            |             |            |
+% |           |            |             |            |
+% |           |------------|-------------|            |         
+% |           |            |             |            |
+% |           |            |             |            |  
+% |           |            |    1        |            |
+% |           |            |             |            |
+% |           |            |-------------|------------|            
+% |           |            |             |            |
+% |           |            |             |     1      |  
+% |           |            |             |            |
+% |           |            |             |            |
+% -----------------------------------------------------
+% |           |            |             |            |
+% |           |            |             |            |
+% |     N     |      -N    |             |            |  
+% |           |            |       1     |      -1    |     = 0
+% |           |            |             |            |
+% |           |            |             |            |
+%------------------------------------------------------
+
+
+%minimize
+% -|0000000000000000000000000000000000000011111111111111|
+lb=zeros(2*E+number_of_segment*2,1);
+[x,fval] = linprog(f,A,ble,Aeq,beq,lb);
+%find min.cut
+C=zeros(1,E);%cut
+
+for i=1:E
+    if abs(x(i,1)-ble(i,1))<10^-3 && x(E+i,1)<10^-3
+       C(1,i)=1;
+    end
+    if  abs(x(E+i,1)-ble(E+i,1))<10^-3 && x(i,1)<10^-3
+       C(1,i)=1;
+    end
+    
+end
+number_of_segment
+E
+%[(1:(2*E+number_of_segment*2))',x,ble]%,[C;C;zeros(2*number_of_segment,1)]]
+Print_m
+%adj_matrix
+%fval
+%sum(x((2*E+1):(2*E+number_of_segment),1))
+%sum(x((2*E+number_of_segment+1):(2*E+2*number_of_segment),1))
+%view(biograph(adj_matrix,[],'ShowWeights','off'));
+ 
+ edge_counter=0;
+ for i=1:number_of_segment
+    for j=1:i
+        if adj_matrix(i,j)==1
+            edge_counter=edge_counter+1;
+            if C(1,edge_counter)==1
+                adj_matrix(i,j)=0;
+                adj_matrix(j,i)=0;
+            end
+        end
+    end
+ end 
+ view(biograph(adj_matrix,[],'ShowWeights','off'));
+ 
+ %extract segmentation
+ O2=zeros(1,number_of_segment);
+ for i=1:number_of_segment
+     if abs(x((2*E+number_of_segment+i),1)-ble(2*E+number_of_segment+i,1))<10^-3
+         O2(1,i)=1;
+         i
+     end
+ end
+
+
+% %--------------------------------------------------------------------------------------------------------------------------
+% %preparation for max-flow-min-cut algorithm
+% K = 0.1; %constant K %value of interaction penalty
+%         
+%                                                     
+% w_adj_matrix(1:number_of_segment,1:number_of_segment)=adj_matrix*K;
+% 
+% %make work vertices for the triangles
+% E=sum(sum(adj_matrix))/2;% number of edges in the graph
+% work_vertices_right=zeros(number_of_segment+2,E);
+% work_vertices_down=zeros(E,number_of_segment+2);
+% 
+% % -------------------------
+% % | \ data  | |           |
+% % |  0 \    | |     WVR   |
+% % |________\|_|           |
+% % |         |0|           |
+% % -------------------------
+% % |           |           |
+% % |           |    zeros  |
+% % |    WVD    |           |
+% % |           |           |
+% % -------------------------
+% 
+% % fill in the work fields
+% edge_counter=0;
+% 
+% for j=1:number_of_segment
+%     for i=1:j
+%         if adj_matrix(i,j)==1
+%             edge_counter=edge_counter+1;
+%             work_vertices_right(j,edge_counter)=K;
+%             work_vertices_down(edge_counter, i)=K;
+%             
+%         end
+%     end
+% end
+% w_adj_matrix=triu(w_adj_matrix,1);
+% 
+% number_of_segment
+% w_adj_matrix=[...
+%     [w_adj_matrix, zeros(number_of_segment,1), ones(number_of_segment,1);...
+%     ones(1,number_of_segment),zeros(1,2);zeros(1,number_of_segment+2);...
+%     work_vertices_down...
+%     ]...
+%     ,[ work_vertices_right;zeros(E)]];
+% 
+% 
+% 
+% for j=1:number_of_segment
+%     w_adj_matrix(number_of_segment+1,j)=w(j,1)+K*(sum(adj_matrix(j,:))/2);
+%     %w_adj_matrix(number_of_segment+2,j)=w(j,2)+K*(sum(adj_matrix(j,:))/2);
+%     %w_adj_matrix(j,number_of_segment+1)=w(j,1)+K*(sum(adj_matrix(j,:))/2);
+%     w_adj_matrix(j,number_of_segment+2)=w(j,2)+K*(sum(adj_matrix(j,:))/2);
+% end
+% 
+% w_adj_matrix=floor(w_adj_matrix*100);
+% 
+% size(w_adj_matrix)
+% [~,~,Orig] = graphmaxflow(sparse(w_adj_matrix), number_of_segment+1, number_of_segment+2);
+% O1=Orig(1,:)
+% 
+% %-------------------------------------------------------------------------------------------------------------------------
+
 
 L=zeros(imH,imW); %labels
 
 % create label matrix L
 for i=1:imH
     for j=1:imW      
-        L(i,j) = O1(l(i,j));
+        L(i,j) = O2(1,l(i,j));
     end
 end
 
