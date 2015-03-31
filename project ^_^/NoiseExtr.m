@@ -123,6 +123,8 @@ counter = zeros(number_of_segment, 3, 5);
         end
     end
 
+    counter = zeros(number_of_segment, 3, 5);
+    
     %fill the array with the standard deviation
     for i=1:imH
         for j=1:imW
@@ -130,6 +132,7 @@ counter = zeros(number_of_segment, 3, 5);
                 for k=1:3 %color
                     for c=1:5 %filter
                         F(l(i,j), k, c, 2) = F(l(i,j), k, c, 2) + (col_fil(k,c,i,j) - F(l(i,j), k, c, 1))^2;
+                        counter(l(i,j), k, c) = counter(l(i,j), k, c) + 1;
                     end
                 end
             end
@@ -187,7 +190,6 @@ for i=1:number_of_segment
     w(i,2) = my_euclidian_distance(squeeze(F(i,:,:,:)), F_max);
 end
 
-%w
 
 K = 0.1; %constant K
 GW = zeros(number_of_segment+2, number_of_segment);
@@ -242,6 +244,7 @@ end
 for i=1:imH
     for j=1:imW
         if(A(i,j) >= 0.5)
+        %if(L(i,j) >= 0.5)
             G(i,j,1) = 255;
             G(i,j,2) = 255;
             G(i,j,3) = 255;
