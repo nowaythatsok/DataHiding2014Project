@@ -1,15 +1,15 @@
 clear all; close all;clc;
 start_time = cputime;
 
- %file_name = 'tulipano90_t';
- %G = imread(file_name,'jpg');
+ file_name = 'tulipano90_t';
+ G = imread(file_name,'jpg');
  
  
- G=zeros(300,300,3);
+ %G=zeros(300,300,3);
  
- G(100:199,100:199,1)=rand(100,100)*1;
- G(100:199,100:199,2)=rand(100,100)*1;
- G(100:199,100:199,3)=rand(100,100)*100;
+ %G(100:199,100:199,1)=rand(100,100)*1;
+ %G(100:199,100:199,2)=rand(100,100)*1;
+ %G(100:199,100:199,3)=rand(100,100)*100;
  %figure;
  %imshow(G);
  
@@ -18,7 +18,7 @@ start_time = cputime;
 
 %clustering with SLIC algo
 % 1000 superpixels using a weighting factor of 1.5 
-number_of_segment = 15;
+number_of_segment = 30;
 %[l, Am, C] = slic(G, number_of_segment, 1.5, 1, 'median');
 [l, Am, C] = slic(G, number_of_segment, 30, 1.5, 'median');
 %Am is just a copy of l i this implementation!!!!!!!!!!
@@ -205,6 +205,7 @@ for i=1:number_of_segment
     w(i,2) = my_euclidian_distance(squeeze(F(i,:,:,:)), F_max);
 end
 
+%w(:,2)=max_distance-w(:,1);
 
 %w(l(5,5),1)
 %w(l(5,5),2)
@@ -219,7 +220,7 @@ hold off;
 
 
 %preparation for Symplex algorithm-----------------------------------------
-K = 0.1; %value of interaction penalty
+K = 0.1*1; %value of interaction penalty
 
 %count number of edges with the original formation, without S,T
 E=sum(sum(adj_matrix))/2;
@@ -306,8 +307,8 @@ for i=1:E
 end
 number_of_segment
 E
-%[(1:(2*E+number_of_segment*2))',x,ble]%,[C;C;zeros(2*number_of_segment,1)]]
-Print_m
+[(1:(2*E+number_of_segment*2))',x,ble]%,[C;C;zeros(2*number_of_segment,1)]]
+%Print_m
 %adj_matrix
 %fval
 %sum(x((2*E+1):(2*E+number_of_segment),1))
@@ -326,7 +327,7 @@ Print_m
         end
     end
  end 
- view(biograph(adj_matrix,[],'ShowWeights','off'));
+ %view(biograph(adj_matrix,[],'ShowWeights','off'));
  
  %extract segmentation
  O2=zeros(1,number_of_segment);
@@ -433,7 +434,7 @@ end
 
 for i=1:imH
     for j=1:imW
-        if(A(i,j) >= 0.5)
+        if(A(i,j) >0)
             G(i,j,1) = 255;
             G(i,j,2) = 0;
             G(i,j,3) = 0;
